@@ -1,1 +1,1563 @@
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101a30"><title>TISA DIGITAL SERVICE</title><style>body{margin:0;background:#101a30;color:#eee;font:15px Arial}*{box-sizing:border-box}button,input,select{font:inherit}header{padding:16px;background:#16233f;position:sticky;top:0}.brand{display:flex;gap:10px;align-items:center}.logo{width:42px;height:42px;background:#f5a623;color:#101a30;border-radius:9px;display:grid;place-items:center;font-weight:900}.tabs{display:flex;gap:5px;overflow:auto;margin-top:12px}.tabs button,.btn{border:1px solid #31436b;background:#1c2c4d;color:#eee;padding:10px;border-radius:8px}.active,.primary{background:#c14e33!important}.wrap{max-width:760px;margin:auto;padding:14px}.card{background:#16233f;border:1px solid #31436b;border-radius:12px;padding:15px;margin-bottom:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:520px){.grid{grid-template-columns:1fr}}label{display:block;color:#9aa7c5;font-size:12px;margin:8px 0 5px}input,select{width:100%;padding:10px;border-radius:7px;border:1px solid #31436b;background:#1c2c4d;color:#eee}.row{display:grid;grid-template-columns:1fr 70px 90px 35px;gap:6px;margin:8px 0}.row button{border:0;background:#7c3322;color:#fff;border-radius:6px}.actions{display:flex;gap:8px;flex-wrap:wrap}.hidden{display:none}.bill{background:#faf6ec;color:#222;padding:18px;border-radius:8px}.bill table{width:100%;border-collapse:collapse}.bill td,.bill th{padding:7px;border-bottom:1px solid #ddd}.history{padding:12px 0;border-bottom:1px solid #31436b;display:grid;grid-template-columns:1fr auto;gap:8px}.muted{color:#9aa7c5;font-size:12px}.danger{color:#ffb4a5}</style></head><body><header><div class="brand"><div class="logo">TDS</div><div><b>TISA DIGITAL SERVICE</b><div class="muted">Offline Billing App</div></div></div><div class="tabs"><button id="n" class="active">New Bill</button><button id="h">History</button><button id="s">Services</button><button id="d">Dashboard</button><button id="logout">Logout</button></div></header><main class="wrap"><section id="login" class="card"><h2>Admin Login</h2><input id="uid" placeholder="User ID"><br><br><input id="pw" type="password" placeholder="Password"><br><br><button class="btn primary" id="loginBtn">Login</button><p id="le" class="danger"></p></section><section id="app" class="hidden"><div id="new" class="card"><h2>New Bill</h2><div class="grid"><div><label>Customer</label><input id="cust"></div><div><label>Phone</label><input id="phone"></div></div><label>Items</label><div id="items"></div><button class="btn" id="add">+ Add Item</button><div class="grid"><div><label>Payment</label><select id="pay"><option>Cash</option><option>UPI</option><option>Card</option><option>Due / Pending</option></select></div><div><label>Discount</label><input id="disc" type="number" value="0"></div></div><br><div class="actions"><button class="btn primary" id="save">Save Bill</button><button class="btn" id="print">Print</button><button class="btn" id="fresh">New</button></div><p id="msg" class="muted"></p></div><div id="history" class="card hidden"><h2>History</h2><div id="hist"></div></div><div id="services" class="card hidden"><h2>Services</h2><div id="svcs"></div><button class="btn" id="addsvc">+ Service</button></div><div id="dash" class="card hidden"><h2>Dashboard</h2><div id="stats"></div></div><div class="bill"><b>TISA DIGITAL SERVICE</b><div>Cyber Café & Online Service Centre</div><hr><div id="preview"></div></div></section></main><script>(function(){const $=id=>document.getElementById(id),KEY='tisa_bills_v1',SKEY='tisa_services_v1',LOCK=15*60*1000;const defaults=[['Xerox B&W',2],['Colour Xerox',5],['Colour Print',10],['B&W Print',5],['Aadhaar Address Change',100],['Aadhaar Mobile Update',100],['PAN Card Apply (New)',160],['Ayushman Bharat eKYC',35],['Ayushman Bharat Update',30],['Balance Check',5],['DBT Link Check',10],['DBT Link',30],['Any PVC Card Print',50],['Ration Card Apply (New)',80],['Ration Card Transfer (Family / Address Change)',50]];let services=JSON.parse(localStorage.getItem(SKEY)||'null')||defaults.map(x=>({name:x[0],rate:x[1]})),items=[{desc:'',qty:1,rate:''}],bills=JSON.parse(localStorage.getItem(KEY)||'[]');function saveS(){localStorage.setItem(SKEY,JSON.stringify(services))}function money(n){return '₹'+Number(n||0).toFixed(2)}function calc(){return items.reduce((a,x)=>a+(+x.qty||0)*(+x.rate||0),0)-Math.min(+$('disc').value||0,items.reduce((a,x)=>a+(+x.qty||0)*(+x.rate||0),0))}function renderItems(){let e=$('items');e.innerHTML='';items.forEach((x,i)=>{let r=document.createElement('div');r.className='row';r.innerHTML='<input placeholder="Service" value="'+x.desc+'"><input type="number" min="0" value="'+x.qty+'"><input type="number" min="0" value="'+x.rate+'"><button>×</button>';let q=r.children[1],rate=r.children[2],desc=r.children[0];desc.oninput=()=>x.desc=desc.value;q.oninput=()=>x.qty=q.value;rate.oninput=()=>x.rate=rate.value;r.lastChild.onclick=()=>{items.splice(i,1);renderItems();preview()};e.appendChild(r)})}function preview(){let html='<table><tr><th>Service</th><th>Qty</th><th>Rate</th><th>Amount</th></tr>';items.forEach(x=>{if(x.desc)html+='<tr><td>'+x.desc+'</td><td>'+x.qty+'</td><td>'+money(x.rate)+'</td><td>'+money((+x.qty||0)*(+x.rate||0))+'</td></tr>'});html+='</table><h3>Total: '+money(calc())+'</h3>';$('preview').innerHTML=html}function renderHist(){let e=$('hist');e.innerHTML=bills.length?bills.map((b,i)=>{let lock=Date.now()-b.savedAt>LOCK;return '<div class="history"><div><b>'+b.no+'</b> · '+(b.customer||'Walk-in')+'<br>'+money(b.total)+'<div class="muted">'+new Date(b.savedAt).toLocaleString()+'</div></div><div><button class="btn" onclick="loadB('+i+')">Open</button> '+(lock?'🔒':'<button class="btn" onclick="delB('+i+')">Delete</button>')+'</div></div>'}).join(''):'No bills yet'}function renderServices(){let e=$('svcs');e.innerHTML=services.map((x,i)=>'<div class="grid"><input value="'+x.name+'" onchange="services['+i+'].name=this.value;saveS()"><input type="number" value="'+x.rate+'" onchange="services['+i+'].rate=this.value;saveS()"></div>').join('')}function tabs(x){['new','history','services','dash'].forEach(k=>$(k).classList.toggle('hidden',k!==x));if(x==='history')renderHist();if(x==='services')renderServices();if(x==='dash')$('stats').innerHTML='<h3>'+bills.length+' bills</h3><h3>'+money(bills.reduce((a,b)=>a+b.total,0))+'</h3>'}$('loginBtn').onclick=()=>{if($('uid').value==='rontee20'&&$('pw').value==='Rana1234@'){$('login').classList.add('hidden');$('app').classList.remove('hidden');renderItems();preview()}else $('le').textContent='Wrong ID or password'};$('logout').onclick=()=>location.reload();$('n').onclick=()=>tabs('new');$('h').onclick=()=>tabs('history');$('s').onclick=()=>tabs('services');$('d').onclick=()=>tabs('dash');$('add').onclick=()=>{items.push({desc:'',qty:1,rate:''});renderItems()};$('addsvc').onclick=()=>{services.push({name:'New service',rate:0});saveS();renderServices()};$('disc').oninput=preview;$('save').onclick=()=>{if(!items.some(x=>x.desc.trim()))return $('msg').textContent='Add a service first.';let no='TDS-'+String(bills.length+1).padStart(4,'0');bills.unshift({no,customer:$('cust').value,phone:$('phone').value,items:JSON.parse(JSON.stringify(items)),total:calc(),savedAt:Date.now()});localStorage.setItem(KEY,JSON.stringify(bills));$('msg').textContent='Saved '+no+'. Delete is available for 15 minutes only.';renderHist()};$('fresh').onclick=()=>{items=[{desc:'',qty:1,rate:''}];$('cust').value='';$('phone').value='';$('disc').value=0;renderItems();preview()};$('print').onclick=()=>window.print();window.loadB=i=>{let b=bills[i];items=b.items.map(x=>({...x}));$('cust').value=b.customer||'';$('phone').value=b.phone||'';renderItems();preview();tabs('new')};window.delB=i=>{if(Date.now()-bills[i].savedAt<=LOCK){bills.splice(i,1);localStorage.setItem(KEY,JSON.stringify(bills));renderHist()}};window.services=services;window.saveS=saveS;setInterval(()=>{if(!$('history').classList.contains('hidden'))renderHist()},1000)})();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101a30">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TISA DIGITAL SERVICE">
+<title>TISA DIGITAL SERVICE — Billing App</title>
+<style>
+  :root{
+    --ink:#101a30;
+    --panel:#16233f;
+    --panel-2:#1c2c4d;
+    --panel-line:#31436b;
+    --paper:#faf6ec;
+    --paper-line:#ddd3b6;
+    --paper-line-strong:#3a3a34;
+    --text:#e9e6da;
+    --text-dim:#93a0bf;
+    --accent:#c14e33;
+    --accent-dim:#7c3322;
+    --good:#5fae7d;
+    --sans:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
+    --mono:ui-monospace,'SFMono-Regular',Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:15px;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent);color:#fff;}
+
+  a{color:inherit;}
+  button{font-family:var(--sans);cursor:pointer;}
+  input,select{font-family:var(--sans);}
+
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex;flex-direction:column;align-items:stretch;gap:12px;
+    padding:14px 16px;
+    border-bottom:1px solid var(--panel-line);
+    position:sticky;top:env(safe-area-inset-top,0px);
+    background:var(--ink);
+    z-index:20;
+  }
+  .brandmark{display:flex;align-items:center;gap:12px;}
+  .brandmark .glyph{
+    width:36px;height:36px;border-radius:8px;
+    background:var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;font-size:14px;color:#fff;
+    flex-shrink:0;
+  }
+  .brandmark h1{
+    font-size:15px;margin:0;font-weight:700;letter-spacing:.01em;
+  }
+  .brandmark p{margin:1px 0 0;font-size:11.5px;color:var(--text-dim);}
+  .tabbtns{
+    display:flex;gap:6px;background:var(--panel);padding:4px;border-radius:9px;
+    border:1px solid var(--panel-line);overflow-x:auto;-webkit-overflow-scrolling:touch;
+  }
+  .tabbtns button{
+    background:transparent;border:0;color:var(--text-dim);font-size:12.5px;font-weight:600;
+    padding:9px 10px;border-radius:6px;transition:background .15s,color .15s;
+    white-space:nowrap;flex:1 0 auto;
+  }
+  .tabbtns button.active{background:var(--accent);color:#fff;}
+
+  /* ---------- Layout (mobile-only, single column) ---------- */
+  .wrap{
+    max-width:640px;margin:0 auto;
+    padding:18px 14px 50px;
+    display:flex;flex-direction:column;gap:18px;
+  }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:12px;text-transform:uppercase;letter-spacing:.09em;
+    margin:0 0 14px;color:var(--text-dim);font-weight:700;
+  }
+  .field{margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;}
+  .field input,.field select{
+    width:100%;background:var(--panel-2);border:1px solid var(--panel-line);
+    color:var(--text);border-radius:7px;padding:9px 10px;font-size:14px;
+    outline:none;transition:border-color .15s;
+  }
+  .field input:focus,.field select:focus{border-color:var(--accent);}
+  .field input::placeholder{color:#5c6a8c;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row3{display:grid;grid-template-columns:1fr 74px 90px;gap:8px;}
+
+  .btn{
+    border-radius:7px;border:1px solid var(--panel-line);background:var(--panel-2);
+    color:var(--text);font-size:13.5px;font-weight:600;padding:11px 14px;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:border-color .15s,background .15s;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-accent{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn-accent:hover{background:var(--accent-dim);border-color:var(--accent-dim);}
+  .btn-block{width:100%;justify-content:center;}
+  .btn-ghost{background:transparent;}
+  .btn-sm{padding:5px 9px;font-size:12px;}
+  .btn-row{display:flex;gap:8px;margin-top:14px;}
+
+  .itemlist{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+  .itemrow{
+    display:grid;grid-template-columns:1fr 46px 64px 22px;gap:6px;align-items:center;
+  }
+  .itemrow input{
+    background:var(--panel-2);border:1px solid var(--panel-line);color:var(--text);
+    border-radius:6px;padding:7px 8px;font-size:13px;width:100%;outline:none;
+  }
+  .itemrow input:focus{border-color:var(--accent);}
+  .itemrow .rm{
+    background:transparent;border:0;color:var(--text-dim);font-size:17px;line-height:1;
+    padding:0;width:22px;height:22px;border-radius:5px;
+  }
+  .itemrow .rm:hover{color:var(--accent);background:var(--panel-2);}
+  .col-hint{display:grid;grid-template-columns:1fr 46px 64px 22px;gap:6px;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;padding:0 2px 2px;}
+
+  .discount-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+
+  .history-item{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:10px 12px;border:1px solid var(--panel-line);border-radius:8px;
+    background:var(--panel-2);margin-bottom:8px;font-size:13px;
+  }
+  .history-item .meta{display:flex;flex-direction:column;gap:2px;}
+  .history-item .meta b{font-family:var(--mono);font-size:12.5px;}
+  .history-item .meta span{color:var(--text-dim);font-size:11.5px;}
+  .history-item .amt{font-family:var(--mono);font-weight:600;color:var(--good);}
+  .history-actions{display:flex;gap:5px;}
+  .empty-note{color:var(--text-dim);font-size:13px;padding:6px 2px;}
+
+  /* ---------- Scan from photo ---------- */
+  .scan-card{border-color:var(--accent);}
+  .scan-drop{
+    border:1px dashed var(--panel-line);border-radius:10px;
+    padding:20px 14px;text-align:center;background:var(--panel-2);
+    transition:border-color .15s,background .15s;
+  }
+  .scan-drop.hot{border-color:var(--accent);background:rgba(193,78,51,.08);}
+  .scan-drop p{margin:0 0 14px;font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .scan-pick-row{display:flex;gap:10px;}
+  .scan-pick-row .btn{flex:1;padding:13px 10px;font-size:14px;}
+  .scan-thumbs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;}
+  .scan-thumbs img{
+    width:72px;height:72px;object-fit:cover;border-radius:8px;
+    border:1px solid var(--panel-line);
+  }
+  .scan-status{
+    font-size:13px;color:var(--text-dim);margin-top:12px;min-height:17px;line-height:1.6;
+  }
+  .scan-status.err{color:var(--accent);}
+  .scan-status.ok{color:var(--good);}
+
+  /* ---------- Receipt ---------- */
+  .receipt-stage{position:static;}
+  .receipt-shell{
+    background:var(--panel-2);
+    border:1px solid var(--panel-line);
+    border-radius:12px;
+    padding:26px clamp(10px,4vw,34px) 0;
+  }
+  .receipt{
+    background:var(--paper);color:#221f16;
+    font-family:var(--mono);
+    max-width:400px;margin:0 auto;
+    padding:26px 22px 18px;
+    box-shadow:0 18px 40px -20px rgba(0,0,0,.6);
+  }
+  .receipt .r-head{text-align:center;margin-bottom:14px;}
+  .receipt .r-head .shopname{font-size:17px;font-weight:700;letter-spacing:.01em;margin:0 0 4px;}
+  .receipt .r-head .shopmeta{font-size:11px;line-height:1.5;color:#54503f;white-space:pre-line;}
+  .receipt .r-title{
+    text-align:center;font-size:11px;letter-spacing:.16em;margin:14px 0 12px;
+    color:#7a7460;
+  }
+  .r-rule{border:none;border-top:1px dashed var(--paper-line-strong);margin:12px 0;}
+  .r-metarow{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;}
+  .r-metarow span:first-child{color:#7a7460;}
+  .r-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
+  .r-table th{
+    text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.03em;
+    color:#7a7460;padding-bottom:6px;border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .r-table th.num,.r-table td.num{text-align:right;}
+  .r-table td{padding:5px 0;vertical-align:top;border-bottom:1px dotted var(--paper-line);}
+  .r-table td.desc{padding-right:6px;}
+  .r-empty-row td{color:#a29c86;font-style:italic;padding:12px 0;text-align:center;border-bottom:none;}
+  .r-totals{margin-top:6px;}
+  .r-totals .line{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;}
+  .r-totals .line.muted{color:#7a7460;}
+  .r-totals .line.grand{
+    font-size:16px;font-weight:700;border-top:1px solid var(--paper-line-strong);
+    margin-top:6px;padding-top:8px;
+  }
+  .r-foot{text-align:center;margin-top:16px;font-size:11px;color:#7a7460;line-height:1.6;}
+  .r-foot .thanks{font-size:12.5px;color:#221f16;font-weight:600;margin-bottom:3px;}
+  .r-billno{font-weight:700;}
+
+  .zigzag{
+    height:13px;max-width:400px;margin:0 auto;
+    background-image:
+      linear-gradient(45deg, transparent 7px, var(--paper) 7px),
+      linear-gradient(-45deg, transparent 7px, var(--paper) 7px);
+    background-size:14px 14px;background-repeat:repeat-x;background-position:bottom left;
+  }
+  .receipt-actions{
+    display:flex;gap:8px;justify-content:center;padding:18px 0 22px;flex-wrap:wrap;
+  }
+
+  .lock-pill{
+    font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .lock-pill.open{background:rgba(95,174,125,.18);color:var(--good);}
+  .lock-pill.locked{background:rgba(147,160,191,.16);color:var(--text-dim);}
+  .history-item{flex-wrap:wrap;}
+  .history-item .row-bottom{width:100%;margin-top:8px;}
+
+  .col-hint.svc{grid-template-columns:1fr 90px 28px;}
+  .svc-row{
+    display:grid;grid-template-columns:1fr 90px 28px;gap:8px;align-items:center;margin-bottom:8px;
+  }
+  .svc-row input{
+    background:var(--panel-2);border:1px solid var(--panel-line);color:var(--text);
+    border-radius:6px;padding:8px 9px;font-size:13px;width:100%;outline:none;
+  }
+  .svc-row input:focus{border-color:var(--accent);}
+  .svc-row .rm{
+    background:transparent;border:0;color:var(--text-dim);font-size:17px;line-height:1;
+    padding:0;width:26px;height:26px;border-radius:5px;
+  }
+  .svc-row .rm:hover{color:var(--accent);background:var(--panel-2);}
+
+  .wrap.full{max-width:640px;}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+  @media (max-width:560px){.stat-grid{grid-template-columns:1fr;}}
+  .stat-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:22px;}
+  .stat-card .label{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+  .stat-card .value{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--good);}
+  .stat-card .sub{font-size:12px;color:var(--text-dim);margin-top:4px;}
+
+  .month-table{width:100%;border-collapse:collapse;}
+  .month-table th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);
+    padding:8px 6px;border-bottom:1px solid var(--panel-line);
+  }
+  .month-table td{padding:10px 6px;border-bottom:1px solid var(--panel-line);font-size:13.5px;}
+  .month-table td.num{font-family:var(--mono);text-align:right;}
+  .month-table tr:last-child td{border-bottom:none;}
+
+  footer.hint{
+    text-align:center;color:var(--text-dim);font-size:12px;padding:0 20px 30px;
+  }
+
+  @media print{
+    body *{visibility:hidden;}
+    .receipt, .receipt *{visibility:visible;}
+    .receipt{
+      position:absolute;top:0;left:50%;transform:translateX(-50%);
+      box-shadow:none;margin:0;
+    }
+  }
+
+/* ---------- Admin login ---------- */
+#loginGate{position:fixed;inset:0;z-index:9999;background:#101a30;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-box{width:min(390px,100%);background:#16233f;border:1px solid #31436b;border-radius:18px;padding:26px;box-shadow:0 24px 80px rgba(0,0,0,.45);text-align:center;}
+.login-logo{width:105px;height:105px;object-fit:cover;border-radius:50%;margin:0 auto 14px;border:2px solid #f5d21f;}
+.login-box h2{margin:0 0 5px;font-size:20px;color:#fff;}
+.login-box p{margin:0 0 20px;color:#93a0bf;font-size:12px;}
+.login-box input{width:100%;background:#1c2c4d;border:1px solid #31436b;color:#e9e6da;border-radius:8px;padding:12px;margin:5px 0;font-size:15px;outline:none;}
+.login-box input:focus{border-color:#c14e33;}
+.login-box button{width:100%;margin-top:10px;}
+.login-error{min-height:18px;color:#c14e33;font-size:12px;margin-top:8px;}
+.brand-logo{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid #f5d21f;flex-shrink:0;}
+</style>
+<link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body>
+<div id="loginGate">
+  <div class="login-box">
+    <img class="login-logo" src="data:image/png;base64,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" alt="TISA DIGITAL SERVICE">
+    <h2>TISA DIGITAL SERVICE</h2>
+    <p>Admin Login • Billing &amp; History</p>
+    <input id="loginUser" type="text" autocomplete="username" placeholder="User ID">
+    <input id="loginPass" type="password" autocomplete="current-password" placeholder="Password">
+    <button class="btn btn-accent" id="loginBtn">Login</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+
+<div class="topbar">
+  <button id="installAppBtn" class="btn btn-accent" style="display:none;position:fixed;right:12px;bottom:12px;z-index:1000;box-shadow:0 8px 25px rgba(0,0,0,.35);">📲 Install App</button>
+  <div class="brandmark">
+    <img class="brand-logo" src="data:image/png;base64,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" alt="TISA DIGITAL SERVICE logo">
+    <div>
+      <h1>TISA DIGITAL SERVICE</h1>
+      <p>Offline Billing Counter</p>
+    </div>
+  </div>
+  <div class="tabbtns">
+    <button id="tab-new" class="active">New bill</button>
+    <button id="tab-history">History</button>
+    <button id="tab-services">Services</button>
+    <button id="tab-dashboard">Dashboard</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- LEFT: controls -->
+  <div id="panel-new">
+
+    <div class="card scan-card" id="scanCard">
+      <h2>📷 Fill from a bill photo</h2>
+      <div class="scan-drop" id="scanDrop">
+        <div class="scan-thumbs" id="scanThumbs" style="display:none;"></div>
+        <p id="scanHint">Take a photo of a bill (or drop an image here) and everything will be read and filled into the form below. Check it afterwards and correct anything that's wrong.</p>
+        <input type="file" id="scanInputCamera" accept="image/*" capture="environment" hidden>
+        <input type="file" id="scanInputFile" accept="image/*" multiple hidden>
+        <div class="scan-pick-row" id="scanPickRow">
+          <button class="btn btn-accent" id="scanCameraBtn">📷 Scan</button>
+          <button class="btn" id="scanUploadBtn">🖼️ Upload</button>
+        </div>
+        <button class="btn btn-accent btn-block" id="scanRunBtn" style="display:none;">Read &amp; fill</button>
+        <button class="btn btn-ghost btn-block" id="scanStopBtn" style="display:none;">Stop</button>
+        <button class="btn btn-ghost btn-block" id="scanClearBtn" style="display:none;">Clear</button>
+      </div>
+      <p class="scan-status" id="scanStatus">Checking whether photo reading is available here…</p>
+    </div>
+
+    <div class="card">
+      <h2>Shop details</h2>
+      <div class="field">
+        <label for="shopName">Café name</label>
+        <input id="shopName" type="text" placeholder="e.g. Star Cyber Café">
+      </div>
+      <div class="field">
+        <label for="shopAddr">Address (optional)</label>
+        <input id="shopAddr" type="text" placeholder="e.g. Near Habra Station, West Bengal">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="shopPhone">Phone / WhatsApp (optional)</label>
+          <input id="shopPhone" type="text" placeholder="98XXXXXXXX">
+        </div>
+        <div class="field">
+          <label for="shopEmail">Email (optional)</label>
+          <input id="shopEmail" type="text" placeholder="name@email.com">
+        </div>
+      </div>
+      <div class="field">
+        <label for="billPrefix">Bill prefix</label>
+        <input id="billPrefix" type="text" placeholder="e.g. TDS">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Bill info</h2>
+      <div class="row2">
+        <div class="field">
+          <label for="billNo">Bill no.</label>
+          <input id="billNo" type="text">
+        </div>
+        <div class="field">
+          <label for="billDate">Date</label>
+          <input id="billDate" type="date">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="custName">Customer name (optional)</label>
+          <input id="custName" type="text" placeholder="Walk-in">
+        </div>
+        <div class="field">
+          <label for="custPhone">Customer phone (optional)</label>          <input id="custPhone" type="text" placeholder="">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Items &amp; services</h2>
+      <div class="col-hint">
+        <span>Service</span><span>Qty</span><span>Rate ₹</span><span></span>
+      </div>
+      <div class="itemlist" id="itemlist"></div>
+      <button class="btn btn-block" id="addItemBtn">+ Add item</button>
+
+      <datalist id="presetList"></datalist>
+    </div>
+
+    <div class="card">
+      <h2>Discount &amp; tax</h2>
+      <div class="discount-row">
+        <div class="field">
+          <label for="discVal">Discount</label>
+          <input id="discVal" type="number" min="0" step="any" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="discType">Type</label>
+          <select id="discType">
+            <option value="amount">₹ amount</option>
+            <option value="percent">% percent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="taxVal">Tax %</label>
+          <input id="taxVal" type="number" min="0" step="any" placeholder="0">
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label for="payMode">Payment mode</label>
+        <select id="payMode">
+          <option>Cash</option>
+          <option>UPI</option>
+          <option>Card</option>
+          <option>Due / Pending</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Receipt footer note</h2>
+      <div class="field">
+        <input id="footNote" type="text" placeholder="e.g. Thank you, visit again!">
+      </div>
+    </div>
+  </div>
+
+  <!-- LEFT slot: history panel (hidden by default) -->
+  <div id="panel-history" style="display:none;">
+    <div class="card">
+      <h2>Saved bills</h2>
+      <p class="empty-note" style="margin-top:-6px;">Each bill can be deleted within 15 minutes of saving. After that it's locked for good, to keep your records accurate.</p>
+      <div id="historyList"></div>
+      <div class="btn-row">
+        <button class="btn btn-block btn-ghost" id="clearHistoryBtn">Delete unlocked bills</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Services & price management -->
+  <div id="panel-services" style="display:none;">
+    <div class="card">
+      <h2>Manage services &amp; prices</h2>
+      <p class="empty-note" style="margin-top:-6px;">These are the services offered when adding an item to a bill. Add, edit, or remove them here — changes apply immediately.</p>
+      <div class="col-hint svc">
+        <span>Service name</span><span>Rate ₹</span><span></span>
+      </div>
+      <div id="svcList"></div>
+      <button class="btn btn-block" id="addSvcBtn">+ Add service</button>
+      <div class="btn-row">
+        <button class="btn btn-block btn-ghost" id="resetSvcBtn">Reset to default list</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly income dashboard -->
+  <div id="panel-dashboard" style="display:none;">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="label" id="dashThisMonthLabel">This month</div>
+        <div class="value" id="dashThisMonthValue">₹0.00</div>
+        <div class="sub" id="dashThisMonthSub">0 bills</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">All-time</div>
+        <div class="value" id="dashAllTimeValue">₹0.00</div>
+        <div class="sub" id="dashAllTimeSub">0 bills total</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Monthly income</h2>
+      <table class="month-table">
+        <thead><tr><th>Month</th><th class="num">Bills</th><th class="num">Income</th></tr></thead>
+        <tbody id="monthTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- RIGHT: receipt preview -->
+  <div class="receipt-stage" id="receiptStage">
+    <div class="receipt-shell">
+      <div class="receipt" id="receipt">
+        <div class="r-head">
+          <p class="shopname" id="r-shopname">Your Cyber Café</p>
+          <p class="shopmeta" id="r-shopmeta">Add your shop details on the left</p>
+        </div>
+        <p class="r-title">CASH RECEIPT</p>
+        <hr class="r-rule">
+        <div class="r-metarow"><span>Bill No.</span><span class="r-billno" id="r-billno">—</span></div>
+        <div class="r-metarow"><span>Date</span><span id="r-date">—</span></div>
+        <div class="r-metarow" id="r-cust-row"><span>Customer</span><span id="r-cust">Walk-in</span></div>
+        <hr class="r-rule">
+        <table class="r-table">
+          <thead>
+            <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amt</th></tr>
+          </thead>
+          <tbody id="r-items">
+            <tr class="r-empty-row"><td colspan="4">No items added yet</td></tr>
+          </tbody>
+        </table>
+        <div class="r-totals" id="r-totals">
+          <div class="line"><span>Subtotal</span><span id="r-subtotal">₹0.00</span></div>
+          <div class="line grand"><span>Total</span><span id="r-total">₹0.00</span></div>
+        </div>
+        <div class="r-foot">
+          <p class="thanks" id="r-thanks">Thank you!</p>
+          <p id="r-paymode">Paid via Cash</p>
+        </div>
+      </div>
+      <div class="zigzag"></div>
+      <div class="receipt-actions">
+        <button class="btn btn-accent" id="saveBtn">Save bill</button>
+        <button class="btn" id="printOnlyBtn">Print bill</button>
+        <button class="btn btn-ghost" id="downloadBtn">Download receipt</button>
+        <button class="btn btn-ghost" id="newBillBtn">New bill</button>
+      </div>
+      <p id="printStatus" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 4px;min-height:16px;"></p>
+    </div>
+  </div>
+
+</div>
+
+<footer class="hint">Bills, services, settings and history are stored locally in this browser. Internet is only needed for photo Read &amp; Fill.</footer>
+
+<script>
+(function(){
+  const USER='rontee20';
+  const PASS='Rana1234@';
+  const gate=document.getElementById('loginGate');
+  const u=document.getElementById('loginUser');
+  const p=document.getElementById('loginPass');
+  const b=document.getElementById('loginBtn');
+  const e=document.getElementById('loginError');
+  function ok(){ gate.style.display='none'; document.body.classList.add('authenticated'); try{sessionStorage.setItem('tds:admin','1');}catch(_){} }
+  function login(){ if(u.value===USER && p.value===PASS){e.textContent='';ok();} else {e.textContent='Wrong User ID or Password';p.value='';p.focus();} }
+  b.addEventListener('click',login); [u,p].forEach(x=>x.addEventListener('keydown',ev=>{if(ev.key==='Enter')login();}));
+  try{if(sessionStorage.getItem('tds:admin')==='1')ok();}catch(_){}
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- storage helpers ----------
+  function lget(key, fallback){
+    try{
+      const v = localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
+    }catch(e){ return fallback; }
+  }
+  function lset(key, val){
+    try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+  }
+
+  // Persistent data contract: never rename/delete these keys during app updates.
+  // Bills/history stay in the browser's localStorage for this app origin.
+  const STORAGE_SCHEMA_VERSION = 1;
+  lset('cybercafe:storageSchemaVersion', STORAGE_SCHEMA_VERSION);
+
+  const DEFAULT_SERVICES = [
+    // General cyber café
+    {name:"Internet Browsing (per hr)", rate:20},
+    {name:"Xerox B&W (per page)", rate:2},
+    {name:"Print B&W A4 (per page)", rate:5},
+    {name:"Colour Print A4 (per page)", rate:10},
+    {name:"Scanning (per page)", rate:10},
+    {name:"CD / DVD Burning", rate:20},
+    {name:"Typing / DTP (per page)", rate:20},
+    {name:"Resume Printing", rate:20},
+    {name:"Passport Photo", rate:30},
+    {name:"Any PVC Card Print (ID Card etc.)", rate:50},
+    // Lamination
+    {name:"A4 Lamination", rate:25},
+    {name:"Lamination - Below A4 (ID Card / Photo)", rate:20},
+    {name:"Document Lamination (Other Size)", rate:30},
+    // Aadhaar
+    {name:"Aadhaar Download (e-Aadhaar)", rate:50},
+    {name:"Aadhaar Address Change", rate:100},
+    {name:"Aadhaar Mobile Update", rate:100},
+    {name:"Aadhaar Lamination", rate:20},
+    // PAN
+    {name:"PAN Card Apply (New)", rate:160},
+    {name:"PAN Correction", rate:180},
+    {name:"PAN Minor to Major", rate:200},
+    {name:"PAN – Aadhaar Linking Check", rate:20},
+    // Voter Card
+    {name:"Voter Card Apply (New)", rate:100},
+    {name:"Voter Card Correction", rate:80},
+    {name:"Voter Card Transfer (Address Change)", rate:100},
+    // Ration Card
+    {name:"Ration Card Apply (New)", rate:80},
+    {name:"Ration Card Correction", rate:30},
+    {name:"Ration Card Transfer (Family / Address Change)", rate:50},
+    {name:"Ration Dealer Change", rate:50},
+    {name:"eKYC Check", rate:5},
+    {name:"eKYC (Ration Card)", rate:30},
+    // Health & Welfare
+    {name:"Ayushman Bharat Check", rate:10},
+    {name:"Ayushman Bharat eKYC", rate:35},
+    {name:"Ayushman Bharat Update", rate:30},
+    {name:"ABHA Health ID Check", rate:5},
+    {name:"ABHA Health ID Create", rate:20},
+    // Banking & Financial
+    {name:"AEPS Withdraw (per ₹1000)", rate:10},
+    {name:"Balance Check", rate:5},
+    {name:"DBT Link Check", rate:10},
+    {name:"DBT Link", rate:30},
+    {name:"Any Bill Payment (per ₹1000)", rate:10},
+    // Other
+    {name:"Any Form Fill-up (Online / Offline)", rate:100}
+  ];
+
+  function loadServices(){
+    const s = lget('cybercafe:services', null);
+    if(Array.isArray(s) && s.length) return s;
+    return DEFAULT_SERVICES.map(p=>({name:p.name, rate:p.rate}));
+  }
+  let services = loadServices();
+  function saveServicesList(){
+    lset('cybercafe:services', services);
+  }
+
+  const presetList = document.getElementById('presetList');
+  function renderPresetDatalist(){
+    presetList.innerHTML = '';
+    services.forEach(p=>{
+      if(!p.name) return;
+      const opt = document.createElement('option');
+      opt.value = p.name;
+      presetList.appendChild(opt);
+    });
+  }
+  renderPresetDatalist();
+
+  function presetRate(name){
+    const p = services.find(x=>x.name === name);
+    return p ? p.rate : null;
+  }
+
+  // ---------- state ----------
+  let shop = lget('cybercafe:shop', {
+    name:'TISA DIGITAL SERVICE',
+    addr:'Cyber Café & Online Service Centre, Gobardanga, North 24 Parganas, West Bengal',
+    phone:'8918334394',
+    email:'rana8918334394@gmail.com',
+    prefix:'TDS',
+    footNote:'Thank you, visit again! / Your Trust Our Service'
+  });
+  let nextBillNo = lget('cybercafe:nextBillNo', 1);
+  let items = [];
+  let itemSeq = 0;
+
+  function newItem(desc, qty, rate){
+    itemSeq++;
+    return {id:'i'+itemSeq, desc: desc||'', qty: qty!==undefined?qty:1, rate: rate!==undefined?rate:''};
+  }
+
+  // ---------- DOM refs ----------
+  const $ = id => document.getElementById(id);
+  const shopName=$('shopName'), shopAddr=$('shopAddr'), shopPhone=$('shopPhone'), shopEmail=$('shopEmail'), billPrefix=$('billPrefix');
+  const billNoEl=$('billNo'), billDateEl=$('billDate'), custName=$('custName'), custPhone=$('custPhone');
+  const itemlist=$('itemlist');
+  const discVal=$('discVal'), discType=$('discType'), taxVal=$('taxVal'), payMode=$('payMode'), footNote=$('footNote');
+
+  // ---------- init shop fields ----------
+  shopName.value = shop.name;
+  shopAddr.value = shop.addr;
+  shopPhone.value = shop.phone;
+  shopEmail.value = shop.email || '';
+  billPrefix.value = shop.prefix;
+  footNote.value = shop.footNote;
+
+  function saveShop(){
+    shop = {
+      name: shopName.value.trim(),
+      addr: shopAddr.value.trim(),
+      phone: shopPhone.value.trim(),
+      email: shopEmail.value.trim(),
+      prefix: (billPrefix.value.trim() || 'CC'),
+      footNote: footNote.value.trim() || 'Thank you, visit again!'
+    };
+    lset('cybercafe:shop', shop);
+    updateBillNoDisplay();
+    render();
+  }
+  [shopName,shopAddr,shopPhone,shopEmail,billPrefix,footNote].forEach(el=>el.addEventListener('input', saveShop));
+
+  function formatBillNo(n){
+    return (shop.prefix ? shop.prefix + '-' : '') + String(n).padStart(4,'0');
+  }
+  function updateBillNoDisplay(){
+    billNoEl.value = formatBillNo(nextBillNo);
+  }
+
+  function todayISO(){
+    const d = new Date();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return d.getFullYear()+'-'+m+'-'+day;
+  }
+  function prettyDate(iso){
+    if(!iso) return '—';
+    const [y,m,d] = iso.split('-');
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d+' '+months[parseInt(m,10)-1]+' '+y;
+  }
+  billDateEl.value = todayISO();
+
+  // ---------- items rendering ----------
+  function addItemRow(desc, qty, rate){
+    items.push(newItem(desc, qty, rate));
+    renderItemRows();
+    render();
+  }
+  function removeItemRow(id){
+    items = items.filter(i=>i.id!==id);
+    renderItemRows();
+    render();
+  }
+  function renderItemRows(){
+    itemlist.innerHTML = '';
+    items.forEach(item=>{
+      const row = document.createElement('div');
+      row.className = 'itemrow';
+      row.innerHTML = `
+        <input type="text" list="presetList" placeholder="e.g. Internet Browsing" value="${escapeAttr(item.desc)}" data-field="desc" data-id="${item.id}">
+        <input type="number" min="0" step="any" placeholder="1" value="${item.qty===''?'':item.qty}" data-field="qty" data-id="${item.id}">
+        <input type="number" min="0" step="any" placeholder="0" value="${item.rate===''?'':item.rate}" data-field="rate" data-id="${item.id}">
+        <button class="rm" title="Remove" data-rm="${item.id}">×</button>
+      `;
+      itemlist.appendChild(row);
+    });
+
+    itemlist.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('input', onItemFieldInput);
+      inp.addEventListener('change', onItemFieldChange);
+    });
+    itemlist.querySelectorAll('[data-rm]').forEach(btn=>{
+      btn.addEventListener('click', ()=>removeItemRow(btn.getAttribute('data-rm')));
+    });
+  }
+  function onItemFieldInput(e){
+    const id = e.target.getAttribute('data-id');
+    const field = e.target.getAttribute('data-field');
+    const item = items.find(i=>i.id===id);
+    if(!item) return;
+    if(field==='desc') item.desc = e.target.value;
+    if(field==='qty') item.qty = e.target.value === '' ? '' : parseFloat(e.target.value);
+    if(field==='rate') item.rate = e.target.value === '' ? '' : parseFloat(e.target.value);
+    render();
+  }
+  function onItemFieldChange(e){
+    const field = e.target.getAttribute('data-field');
+    if(field !== 'desc') return;
+    const id = e.target.getAttribute('data-id');
+    const item = items.find(i=>i.id===id);
+    if(!item) return;
+    const r = presetRate(item.desc);
+    if(r !== null && (item.rate==='' || item.rate===undefined)){
+      item.rate = r;
+      if(item.qty==='' || item.qty===undefined) item.qty = 1;
+      renderItemRows();
+      render();
+    }
+  }
+  function escapeAttr(s){
+    return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  }
+  function escapeHtml(s){
+    return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  $('addItemBtn').addEventListener('click', ()=>addItemRow('',1,''));
+
+  // ---------- services management ----------
+  function renderServicesPanel(){
+    const list = $('svcList');
+    list.innerHTML = '';
+    services.forEach((svc, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'svc-row';
+      row.innerHTML = `
+        <input type="text" placeholder="Service name" value="${escapeAttr(svc.name)}" data-svc-field="name" data-idx="${idx}">
+        <input type="number" min="0" step="any" placeholder="Rate" value="${svc.rate===''||svc.rate===undefined?'':svc.rate}" data-svc-field="rate" data-idx="${idx}">
+        <button class="rm" title="Delete service" data-svc-rm="${idx}">×</button>
+      `;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('[data-svc-field]').forEach(inp=>{
+      inp.addEventListener('input', onSvcFieldInput);
+    });
+    list.querySelectorAll('[data-svc-rm]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        services.splice(parseInt(btn.getAttribute('data-svc-rm'),10),1);
+        saveServicesList();
+        renderPresetDatalist();
+        renderServicesPanel();
+      });
+    });
+  }
+  function onSvcFieldInput(e){
+    const idx = parseInt(e.target.getAttribute('data-idx'),10);
+    const field = e.target.getAttribute('data-svc-field');
+    if(!services[idx]) return;
+    if(field==='name') services[idx].name = e.target.value;
+    if(field==='rate') services[idx].rate = e.target.value==='' ? '' : parseFloat(e.target.value);
+    saveServicesList();
+    renderPresetDatalist();
+  }
+  $('addSvcBtn').addEventListener('click', ()=>{
+    services.push({name:'', rate:''});
+    saveServicesList();
+    renderPresetDatalist();
+    renderServicesPanel();
+  });
+  $('resetSvcBtn').addEventListener('click', ()=>{
+    if(confirm('Reset services to the default list? Any services you added or edited will be lost.')){
+      services = DEFAULT_SERVICES.map(p=>({name:p.name, rate:p.rate}));
+      saveServicesList();
+      renderPresetDatalist();
+      renderServicesPanel();
+    }
+  });
+
+  // ---------- calculations ----------
+  function computeTotals(){
+    let subtotal = 0;
+    items.forEach(i=>{
+      const q = parseFloat(i.qty)||0;
+      const r = parseFloat(i.rate)||0;
+      subtotal += q*r;
+    });
+    const dVal = parseFloat(discVal.value)||0;
+    let discAmt = 0;
+    if(discType.value === 'percent'){ discAmt = subtotal * dVal/100; }
+    else { discAmt = dVal; }
+    discAmt = Math.min(discAmt, subtotal);
+    const afterDisc = subtotal - discAmt;
+    const taxPct = parseFloat(taxVal.value)||0;
+    const taxAmt = afterDisc * taxPct/100;
+    const total = afterDisc + taxAmt;
+    return {subtotal, discAmt, taxAmt, taxPct, total};
+  }
+  function money(n){
+    return '₹' + (Math.round(n*100)/100).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  [discVal,discType,taxVal,payMode].forEach(el=>el.addEventListener('input', render));
+  custName.addEventListener('input', render);
+  custPhone.addEventListener('input', render);
+  billDateEl.addEventListener('input', render);
+  billNoEl.addEventListener('input', render);
+
+  // ---------- render receipt ----------
+  function render(){
+    $('r-shopname').textContent = shop.name || 'Your Cyber Café';
+    const metaLines = [shop.addr, shop.phone ? 'Ph: '+shop.phone : '', shop.email ? shop.email : ''].filter(Boolean);
+    $('r-shopmeta').textContent = metaLines.length ? metaLines.join('\n') : 'Add your shop details on the left';
+
+    $('r-billno').textContent = billNoEl.value || formatBillNo(nextBillNo);
+    $('r-date').textContent = prettyDate(billDateEl.value);
+
+    const cname = custName.value.trim();
+    const cphone = custPhone.value.trim();
+    $('r-cust').textContent = cname ? (cname + (cphone ? ' · '+cphone : '')) : 'Walk-in';
+
+    const tbody = $('r-items');
+    tbody.innerHTML = '';
+    const validItems = items.filter(i => (i.desc && i.desc.trim()) || (parseFloat(i.qty)||0) || (parseFloat(i.rate)||0));
+    if(validItems.length === 0){
+      tbody.innerHTML = '<tr class="r-empty-row"><td colspan="4">No items added yet</td></tr>';
+    } else {
+      validItems.forEach(i=>{
+        const q = i.qty===''||i.qty===undefined ? 0 : i.qty;
+        const r = i.rate===''||i.rate===undefined ? 0 : i.rate;
+        const amt = (parseFloat(q)||0)*(parseFloat(r)||0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="desc">${escapeHtml(i.desc||'Item')}</td><td class="num">${q||0}</td><td class="num">${(parseFloat(r)||0).toFixed(2)}</td><td class="num">${amt.toFixed(2)}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    const t = computeTotals();
+    let totalsHtml = `<div class="line"><span>Subtotal</span><span>${money(t.subtotal)}</span></div>`;
+    if(t.discAmt > 0){
+      totalsHtml += `<div class="line muted"><span>Discount</span><span>&minus; ${money(t.discAmt)}</span></div>`;
+    }
+    if(t.taxAmt > 0){
+      totalsHtml += `<div class="line muted"><span>Tax (${t.taxPct}%)</span><span>+ ${money(t.taxAmt)}</span></div>`;
+    }
+    totalsHtml += `<div class="line grand"><span>Total</span><span>${money(t.total)}</span></div>`;
+    $('r-totals').innerHTML = totalsHtml;
+
+    $('r-thanks').textContent = shop.footNote || 'Thank you, visit again!';
+    $('r-paymode').textContent = 'Paid via ' + payMode.value;
+  }
+
+  // ---------- reliable print / download ----------
+  const RECEIPT_PRINT_CSS = `
+    *{box-sizing:border-box;}
+    body{margin:0;background:#e9e6da;padding:28px 12px;font-family:'IBM Plex Mono',ui-monospace,monospace;}
+    .receipt{background:#faf6ec;color:#221f16;max-width:400px;margin:0 auto;padding:26px 22px 22px;box-shadow:0 10px 30px -12px rgba(0,0,0,.35);}
+    .r-head{text-align:center;margin-bottom:14px;}
+    .r-head .shopname{font-size:17px;font-weight:700;margin:0 0 4px;}
+    .r-head .shopmeta{font-size:11px;line-height:1.5;color:#54503f;white-space:pre-line;}
+    .r-title{text-align:center;font-size:11px;letter-spacing:.16em;margin:14px 0 12px;color:#7a7460;}
+    .r-rule{border:none;border-top:1px dashed #3a3a34;margin:12px 0;}
+    .r-metarow{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;}
+    .r-metarow span:first-child{color:#7a7460;}
+    .r-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
+    .r-table th{text-align:left;font-weight:600;font-size:10.5px;color:#7a7460;padding-bottom:6px;border-bottom:1px dashed #3a3a34;}
+    .r-table th.num,.r-table td.num{text-align:right;}
+    .r-table td{padding:5px 0;border-bottom:1px dotted #ddd3b6;}
+    .r-table td.desc{padding-right:6px;}
+    .r-empty-row td{color:#a29c86;font-style:italic;padding:12px 0;text-align:center;border-bottom:none;}
+    .r-totals .line{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;}
+    .r-totals .line.muted{color:#7a7460;}
+    .r-totals .line.grand{font-size:16px;font-weight:700;border-top:1px solid #3a3a34;margin-top:6px;padding-top:8px;}
+    .r-foot{text-align:center;margin-top:16px;font-size:11px;color:#7a7460;line-height:1.6;}
+    .r-foot .thanks{font-size:12.5px;color:#221f16;font-weight:600;margin-bottom:3px;}
+    @media print{ body{background:#fff;padding:0;} .receipt{box-shadow:none;margin:0;} }
+  `;
+
+  function buildStandaloneReceiptHTML(){
+    const title = (billNoEl.value || 'Receipt').replace(/</g,'&lt;');
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+title+'</title>'
+      + '<style>'+RECEIPT_PRINT_CSS+'</style></head><body>'
+      + document.getElementById('receipt').outerHTML
+      + '<script>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},200);};<\/script>'
+      + '</body></html>';
+  }
+
+  function setPrintStatus(msg){
+    const el = $('printStatus');
+    if(el) el.textContent = msg || '';
+  }
+
+  async function offerDownload(html, silent){
+    try{
+      if(!window.claude || !window.claude.use) throw new Error('no-claude');
+      const downloads = await window.claude.use('downloads');
+      if(!downloads) throw new Error('not-granted');
+      const filename = (billNoEl.value || 'receipt').replace(/[^a-z0-9_-]+/gi,'_') + '.html';
+      await downloads.save({filename, data: html});
+      setPrintStatus('Receipt downloaded — open the file and print it from there.');
+      return true;
+    }catch(e){
+      if(!silent){
+        setPrintStatus('Could not open a print window here. Try opening this page in your browser tab, then use Print.');
+      }
+      return false;
+    }
+  }
+
+  function tryPrintReceipt(){
+    setPrintStatus('');
+    const html = buildStandaloneReceiptHTML();
+    let opened = null;
+    try{ opened = window.open('', '_blank'); }catch(e){ opened = null; }
+    if(opened && !opened.closed){
+      try{
+        opened.document.open();
+        opened.document.write(html);
+        opened.document.close();
+        setPrintStatus('Opened a print-ready tab — use its Print dialog.');
+        return;
+      }catch(e){ /* fall through */ }
+    }
+    let inPagePrinted = false;
+    try{ window.print(); inPagePrinted = true; }catch(e){ inPagePrinted = false; }
+    offerDownload(html, inPagePrinted);
+  }
+
+  $('downloadBtn').addEventListener('click', ()=>{
+    const html = buildStandaloneReceiptHTML();
+    offerDownload(html, false);
+  });
+
+
+  function currentBillObject(){
+    const t = computeTotals();
+    return {
+      billNo: billNoEl.value || formatBillNo(nextBillNo),
+      date: billDateEl.value,
+      customer: custName.value.trim(),
+      custPhone: custPhone.value.trim(),
+      items: items.map(i=>({desc:i.desc, qty:i.qty, rate:i.rate})),
+      discount: {type: discType.value, value: parseFloat(discVal.value)||0},
+      taxPct: parseFloat(taxVal.value)||0,
+      payMode: payMode.value,
+      totals: t,
+      savedAt: Date.now()
+    };
+  }
+
+  // Save only — printing is a separate button now.
+  function saveBill(){
+    const validItems = items.filter(i => (i.desc && i.desc.trim()) || (parseFloat(i.qty)||0) || (parseFloat(i.rate)||0));
+    if(validItems.length === 0){
+      setPrintStatus('Add at least one item before saving.');
+      return;
+    }
+    const bill = currentBillObject();
+    const hist = lget('cybercafe:bills', []);
+    hist.unshift(bill);
+    lset('cybercafe:bills', hist);
+
+    // bump bill number if it matches the auto-suggested one
+    if(billNoEl.value === formatBillNo(nextBillNo)){
+      nextBillNo += 1;
+      lset('cybercafe:nextBillNo', nextBillNo);
+    }
+    renderHistory();
+    setPrintStatus('Saved ' + bill.billNo + ' — ' + money(bill.totals.total) + '. Use Print bill if you need a copy.');
+  }
+
+  $('saveBtn').addEventListener('click', saveBill);
+  $('printOnlyBtn').addEventListener('click', tryPrintReceipt);
+  $('newBillBtn').addEventListener('click', startNewBill);
+
+
+  function startNewBill(){
+    items = [];
+    itemSeq = 0;
+    custName.value = '';
+    custPhone.value = '';
+    billDateEl.value = todayISO();
+    discVal.value = '';
+    taxVal.value = '';
+    updateBillNoDisplay();
+    addItemRow('', 1, '');
+    setPrintStatus('');
+    switchTab('new');
+  }
+
+  // ---------- scan a bill photo and auto-fill ----------
+  const scanCard=$('scanCard'), scanDrop=$('scanDrop'),
+        scanInputCamera=$('scanInputCamera'), scanInputFile=$('scanInputFile'),
+        scanThumbs=$('scanThumbs'), scanStatus=$('scanStatus'), scanHint=$('scanHint'),
+        scanPickRow=$('scanPickRow'), scanCameraBtn=$('scanCameraBtn'), scanUploadBtn=$('scanUploadBtn'),
+        scanRunBtn=$('scanRunBtn'), scanStopBtn=$('scanStopBtn'), scanClearBtn=$('scanClearBtn');
+
+  let sampleFn = null;
+  let imageLimits = null;
+  let pickedFiles = [];
+  let scanCtl = null;
+  let thumbUrls = [];
+
+  function setScanStatus(msg, kind){
+    scanStatus.textContent = msg || '';
+    scanStatus.className = 'scan-status' + (kind ? ' ' + kind : '');
+  }
+
+  function clearPicked(){
+    pickedFiles = [];
+    thumbUrls.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(e){} });
+    thumbUrls = [];
+    scanThumbs.innerHTML = '';
+    scanThumbs.style.display = 'none';
+    scanInputCamera.value = '';
+    scanInputFile.value = '';
+    scanRunBtn.style.display = 'none';
+    scanClearBtn.style.display = 'none';
+    scanPickRow.style.display = '';
+    scanHint.style.display = '';
+    setScanStatus(sampleFn ? 'Ready — scan or upload a bill photo.' : '');
+  }
+
+  function setPicked(fileList){
+    const max = (imageLimits && imageLimits.maxCount) || 3;
+    const files = Array.from(fileList).filter(f=>f && f.type && f.type.indexOf('image/')===0).slice(0, max);
+    if(!files.length){
+      setScanStatus('That file is not an image. Pick a photo of the bill.', 'err');
+      return;
+    }
+    thumbUrls.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(e){} });
+    thumbUrls = [];
+    pickedFiles = files;
+    scanThumbs.innerHTML = '';
+    files.forEach(f=>{
+      const url = URL.createObjectURL(f);
+      thumbUrls.push(url);
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Bill photo';
+      scanThumbs.appendChild(img);
+    });
+    scanThumbs.style.display = 'flex';
+    scanHint.style.display = 'none';
+    scanPickRow.style.display = 'none';
+    scanRunBtn.style.display = '';
+    scanClearBtn.style.display = '';
+    setScanStatus(files.length + (files.length===1?' photo ready.':' photos ready.') + ' Tap “Read & fill”.');
+  }
+
+  scanCameraBtn.addEventListener('click', ()=>scanInputCamera.click());
+  scanUploadBtn.addEventListener('click', ()=>scanInputFile.click());
+  scanThumbs.addEventListener('click', ()=>scanUploadBtn.click());
+  scanInputCamera.addEventListener('change', ()=>{ if(scanInputCamera.files && scanInputCamera.files.length) setPicked(scanInputCamera.files); });
+  scanInputFile.addEventListener('change', ()=>{ if(scanInputFile.files && scanInputFile.files.length) setPicked(scanInputFile.files); });
+  scanClearBtn.addEventListener('click', clearPicked);
+
+  ['dragenter','dragover'].forEach(ev=>scanDrop.addEventListener(ev, e=>{
+    e.preventDefault(); scanDrop.classList.add('hot');
+  }));
+  ['dragleave','drop'].forEach(ev=>scanDrop.addEventListener(ev, e=>{
+    e.preventDefault(); scanDrop.classList.remove('hot');
+  }));
+  scanDrop.addEventListener('drop', e=>{
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) setPicked(e.dataTransfer.files);
+  });
+
+  function serviceListForPrompt(){
+    return services
+      .filter(s=>s.name)
+      .map(s=>'- ' + s.name + ' (₹' + (s.rate===''||s.rate===undefined?'?':s.rate) + ')')
+      .join('\n')
+      .slice(0, 6000);
+  }
+
+  function scanPrompt(){
+    return [
+      'You are reading a photograph of a shop bill / receipt from a cyber café in India.',
+      'Extract what is written on it and reply with ONLY one JSON object, no other text.',
+      '',
+      'Shape (use null when something is not on the bill):',
+      '{"billNo":string|null,"date":"YYYY-MM-DD"|null,"customer":string|null,"customerPhone":string|null,',
+      ' "items":[{"desc":string,"qty":number,"rate":number}],',
+      ' "discountValue":number|null,"discountType":"amount"|"percent"|null,',
+      ' "taxPct":number|null,"payMode":"Cash"|"UPI"|"Card"|"Due / Pending"|null,"note":string|null}',
+      '',
+      'Rules:',
+      '- "rate" is the price of ONE unit. If the bill only shows a line total, divide it by the quantity.',
+      '- If quantity is not written, use 1.',
+      '- Dates written as DD/MM/YYYY or DD-MM-YY are Indian format: day first.',
+      '- Amounts have no currency symbol or commas: 1250.50, not "₹1,250.50".',
+      '- Handwriting is common. Read it as carefully as you can; if a line is unreadable, still',
+      '  include it with your best guess and mention it in "note".',
+      '- Match each item to one of the shop\'s standard service names below when it clearly is the',
+      '  same service, and use that exact name. Otherwise keep the words written on the bill.',
+      '',
+      'Standard services (name and usual rate):',
+      serviceListForPrompt()
+    ].join('\n');
+  }
+
+  function num(v){
+    if(v === null || v === undefined || v === '') return null;
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+    return isNaN(n) ? null : n;
+  }
+  function str(v){
+    if(v === null || v === undefined) return '';
+    return String(v).trim();
+  }
+  function isoDate(v){
+    const s = str(v);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return '';
+  }
+
+  function applyScan(data){
+    if(!data || typeof data !== 'object') throw new Error('bad');
+    const filled = [];
+
+    const bNo = str(data.billNo);
+    if(bNo){ billNoEl.value = bNo; filled.push('bill no.'); }
+
+    const d = isoDate(data.date);
+    if(d){ billDateEl.value = d; filled.push('date'); }
+
+    const cn = str(data.customer);    if(cn){ custName.value = cn; filled.push('customer'); }
+    const cp = str(data.customerPhone);
+    if(cp){ custPhone.value = cp; }
+
+    const arr = Array.isArray(data.items) ? data.items : [];
+    const clean = arr
+      .map(it=>({
+        desc: str(it && it.desc),
+        qty: num(it && it.qty),
+        rate: num(it && it.rate)
+      }))
+      .filter(it=>it.desc || it.qty || it.rate);
+    if(clean.length){
+      items = [];
+      itemSeq = 0;
+      clean.forEach(it=>{
+        let rate = it.rate;
+        if(rate === null){
+          const pr = presetRate(it.desc);
+          if(pr !== null) rate = pr;
+        }
+        items.push(newItem(it.desc, it.qty === null ? 1 : it.qty, rate === null ? '' : rate));
+      });
+      renderItemRows();
+      filled.push(clean.length + (clean.length===1 ? ' item' : ' items'));
+    }
+
+    const dv = num(data.discountValue);
+    if(dv !== null && dv > 0){
+      discVal.value = dv;
+      discType.value = (str(data.discountType) === 'percent') ? 'percent' : 'amount';
+      filled.push('discount');
+    }
+    const tx = num(data.taxPct);
+    if(tx !== null && tx > 0){ taxVal.value = tx; filled.push('tax'); }
+
+    const pm = str(data.payMode);
+    if(pm){
+      const opts = Array.from(payMode.options).map(o=>o.value);
+      const hit = opts.find(o=>o.toLowerCase() === pm.toLowerCase());
+      if(hit){ payMode.value = hit; filled.push('payment mode'); }
+    }
+
+    render();
+    return {filled, note: str(data.note)};
+  }
+
+  function scanErrorText(code){
+    switch(code){
+      case 'cancelled': return 'Stopped.';
+      case 'rate_limited': return 'Too many reads just now. Wait a minute and try again.';
+      case 'image_rejected': return 'That image could not be used — try a smaller or clearer photo (JPG or PNG).';
+      case 'invalid_json': return 'Could not read the bill clearly. Try a straighter, brighter photo.';
+      case 'session_expired': return 'Your Claude session expired. Reload the page and sign in again.';
+      case 'refused': return 'That image could not be processed. Try a photo of the bill itself.';
+      case 'prompt_too_large': return 'Too much to read at once — try one bill photo at a time.';
+      case 'not_granted':
+      case 'sampling_disabled': return 'Photo reading is not available on this account.';
+      default: return 'Something went wrong while reading the photo. Try again.';
+    }
+  }
+
+  function scanBusy(on){
+    scanRunBtn.disabled = on;
+    scanClearBtn.disabled = on;
+    scanStopBtn.style.display = on ? '' : 'none';
+    scanRunBtn.textContent = on ? 'Reading…' : 'Read & fill';
+  }
+
+  scanStopBtn.addEventListener('click', ()=>{ if(scanCtl) scanCtl.abort(); });
+
+  scanRunBtn.addEventListener('click', async ()=>{
+    if(!sampleFn || !pickedFiles.length) return;
+    scanCtl = new AbortController();
+    scanBusy(true);
+    setScanStatus('Reading the photo… this can take up to a minute.');
+    try{
+      const data = await sampleFn.json(scanPrompt(), {
+        images: pickedFiles,
+        modelTier: 'complex',
+        signal: scanCtl.signal
+      });
+      const res = applyScan(data);
+      const what = res.filled.length ? res.filled.join(', ') : 'nothing readable';
+      setScanStatus('Filled: ' + what + '. Please check every line and correct anything wrong.'
+        + (res.note ? ' Note: ' + res.note : ''), 'ok');
+      scanRunBtn.style.display = 'none';
+      scanClearBtn.style.display = 'none';
+      scanThumbs.style.display = 'none';
+      scanHint.style.display = '';
+      scanHint.textContent = 'Scan another photo if you have more bills to add.';
+      scanPickRow.style.display = '';
+    }catch(e){
+      const code = (e && e.code) || '';
+      setScanStatus(scanErrorText(code), code === 'cancelled' ? '' : 'err');
+      if(code === 'not_granted' || code === 'sampling_disabled' || code === 'not_declared'){
+        scanCard.style.display = 'none';
+      }
+    }finally{
+      scanBusy(false);
+      scanCtl = null;
+    }
+  });
+
+  (async function initScan(){
+    try{
+      if(!window.claude || !window.claude.use){
+        scanCameraBtn.disabled = false;
+        scanUploadBtn.disabled = false;
+        setScanStatus('Upload/Scan works offline. Read & Fill needs internet.', 'ok');
+        return;
+      }
+      const s = await window.claude.use('sample');
+      if(!s){
+        setScanStatus('Photo reading isn\'t available on this view right now (it may need to load from the actual artifact link rather than a preview). Try opening the artifact link directly.', 'err');
+        return;
+      }
+      const limits = await s.limits().catch(()=>null);
+      if(!limits){
+        setScanStatus('Could not check photo-reading limits. Try reloading the page.', 'err');
+        return;
+      }
+      if(!limits.images){
+        setScanStatus('This account/view can talk to Claude but can\'t send images yet, so photo reading is off. You can still fill the bill in by hand below.', 'err');
+        return;
+      }
+      sampleFn = s;
+      imageLimits = limits.images;
+      if(imageLimits.mediaTypes && imageLimits.mediaTypes.length){
+        scanInputCamera.accept = imageLimits.mediaTypes.join(',');
+        scanInputFile.accept = imageLimits.mediaTypes.join(',');
+      }
+      if(imageLimits.maxCount > 1){
+        scanInputFile.setAttribute('multiple','');
+      }
+      scanCameraBtn.disabled = false;
+      scanUploadBtn.disabled = false;
+      setScanStatus('Ready — scan or upload a bill photo.');
+    }catch(e){
+      scanCameraBtn.disabled = false;
+      scanUploadBtn.disabled = false;
+      setScanStatus('Upload/Scan ready. Internet is only needed for Read & Fill.', 'ok');
+    }
+  })();
+
+  // ---------- history ----------
+  const LOCK_MS = 15 * 60 * 1000;
+  function isLocked(bill){
+    return (Date.now() - (bill.savedAt || 0)) > LOCK_MS;
+  }
+  function lockRemainingLabel(bill){
+    const remain = LOCK_MS - (Date.now() - (bill.savedAt || 0));
+    if(remain <= 0) return null;
+    const totalSec = Math.ceil(remain/1000);
+    const m = Math.floor(totalSec/60);
+    const s = totalSec % 60;
+    return m + ':' + String(s).padStart(2,'0');
+  }
+  function renderHistory(){
+    const hist = lget('cybercafe:bills', []);
+    const container = $('historyList');
+    if(hist.length === 0){
+      container.innerHTML = '<p class="empty-note">No bills saved yet. Bills you save will appear here.</p>';
+      return;
+    }
+    container.innerHTML = '';
+    hist.forEach((b, idx)=>{
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      const locked = isLocked(b);
+      const remain = lockRemainingLabel(b);
+      const pill = locked
+        ? '<span class="lock-pill locked">🔒 Locked</span>'
+        : '<span class="lock-pill open">🕒 ' + remain + ' left to delete</span>';
+      const delBtn = locked
+        ? '<button class="btn btn-sm btn-ghost" disabled style="opacity:.4;cursor:not-allowed;">Delete</button>'
+        : '<button class="btn btn-sm btn-ghost" data-del="' + idx + '">Delete</button>';
+      div.innerHTML = `
+        <div class="meta">
+          <b>${escapeHtml(b.billNo)}</b>
+          <span>${escapeHtml(b.customer || 'Walk-in')} · ${escapeHtml(prettyDate(b.date))}</span>
+        </div>
+        <div class="amt">${money(b.totals.total)}</div>
+        <div class="history-actions">
+          <button class="btn btn-sm" data-load="${idx}">Open</button>
+          ${delBtn}
+        </div>
+        <div class="row-bottom">${pill}</div>
+      `;
+      container.appendChild(div);
+    });
+    container.querySelectorAll('[data-load]').forEach(btn=>{
+      btn.addEventListener('click', ()=>loadBill(parseInt(btn.getAttribute('data-load'),10)));
+    });
+    container.querySelectorAll('[data-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(confirm('Delete this bill? This is only possible within 15 minutes of saving.')){
+          deleteBill(parseInt(btn.getAttribute('data-del'),10));
+        }
+      });
+    });
+  }
+  function loadBill(idx){
+    const hist = lget('cybercafe:bills', []);
+    const b = hist[idx];
+    if(!b) return;
+    items = (b.items||[]).map(i=>newItem(i.desc, i.qty, i.rate));
+    billNoEl.value = b.billNo;
+    billDateEl.value = b.date || todayISO();
+    custName.value = b.customer || '';
+    custPhone.value = b.custPhone || '';
+    discType.value = (b.discount && b.discount.type) || 'amount';
+    discVal.value = (b.discount && b.discount.value) || '';
+    taxVal.value = b.taxPct || '';
+    payMode.value = b.payMode || 'Cash';
+    renderItemRows();
+    render();
+    switchTab('new');
+  }
+  function deleteBill(idx){
+    const hist = lget('cybercafe:bills', []);
+    const b = hist[idx];
+    if(!b) return;
+    if(isLocked(b)){
+      alert('This bill is locked and can no longer be deleted.');
+      renderHistory();
+      return;
+    }
+    hist.splice(idx,1);
+    lset('cybercafe:bills', hist);
+    renderHistory();
+  }
+  $('clearHistoryBtn').addEventListener('click', ()=>{
+    const hist = lget('cybercafe:bills', []);
+    const deletable = hist.filter(b=>!isLocked(b));
+    if(deletable.length === 0){
+      alert('There are no bills currently within their 15-minute delete window.');
+      return;
+    }
+    if(confirm('Delete all ' + deletable.length + ' bill(s) still within their 15-minute delete window? Locked bills will be kept.')){
+      const kept = hist.filter(isLocked);
+      lset('cybercafe:bills', kept);
+      renderHistory();
+    }
+  });
+
+  // keep the delete countdown live while History is open
+  let activeTab = 'new';
+  setInterval(()=>{
+    if(activeTab === 'history') renderHistory();
+  }, 1000);
+
+  // ---------- dashboard: monthly income ----------
+  function monthKeyOf(b){
+    let d = null;
+    if(b.date){
+      const parts = b.date.split('-');
+      if(parts.length === 3){
+        d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, 1);
+      }
+    }
+    if(!d || isNaN(d.getTime())) d = new Date(b.savedAt || Date.now());
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+  function monthLabelOf(key){
+    const parts = key.split('-').map(Number);
+    const y = parts[0], m = parts[1];
+    const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return months[m-1] + ' ' + y;
+  }
+  function computeMonthly(){
+    const hist = lget('cybercafe:bills', []);
+    const map = {};
+    hist.forEach(b=>{
+      const key = monthKeyOf(b);
+      if(!map[key]) map[key] = {count:0, total:0};
+      map[key].count += 1;
+      map[key].total += (b.totals && b.totals.total) || 0;
+    });
+    const keys = Object.keys(map).sort().reverse();
+    const rows = keys.map(k=>({key:k, label: monthLabelOf(k), count: map[k].count, total: map[k].total}));
+    const now = new Date();
+    const curKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    const thisMonth = map[curKey] ? map[curKey] : {count:0, total:0};
+    let allCount = 0, allTotal = 0;
+    hist.forEach(b=>{ allCount += 1; allTotal += (b.totals && b.totals.total) || 0; });
+    return {rows, thisMonth, allTime:{count:allCount, total:allTotal}, curLabel: monthLabelOf(curKey)};
+  }
+  function renderDashboard(){
+    const d = computeMonthly();
+    $('dashThisMonthLabel').textContent = d.curLabel;
+    $('dashThisMonthValue').textContent = money(d.thisMonth.total);
+    $('dashThisMonthSub').textContent = d.thisMonth.count + (d.thisMonth.count===1 ? ' bill' : ' bills');
+    $('dashAllTimeValue').textContent = money(d.allTime.total);
+    $('dashAllTimeSub').textContent = d.allTime.count + (d.allTime.count===1 ? ' bill total' : ' bills total');
+
+    const tbody = $('monthTableBody');
+    if(d.rows.length === 0){
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-dim);font-style:italic;">No bills saved yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.rows.map(r=>
+      '<tr><td>'+escapeHtml(r.label)+'</td><td class="num">'+r.count+'</td><td class="num">'+money(r.total)+'</td></tr>'
+    ).join('');
+  }
+
+  // ---------- tabs ----------
+  function switchTab(which){
+    activeTab = which;
+    $('panel-new').style.display = which==='new' ? '' : 'none';
+    $('panel-history').style.display = which==='history' ? '' : 'none';
+    $('panel-services').style.display = which==='services' ? '' : 'none';
+    $('panel-dashboard').style.display = which==='dashboard' ? '' : 'none';
+
+    $('tab-new').classList.toggle('active', which==='new');
+    $('tab-history').classList.toggle('active', which==='history');
+    $('tab-services').classList.toggle('active', which==='services');
+    $('tab-dashboard').classList.toggle('active', which==='dashboard');
+
+    const fullWidth = (which==='services' || which==='dashboard');
+    document.querySelector('.wrap').classList.toggle('full', fullWidth);
+    $('receiptStage').style.display = fullWidth ? 'none' : '';
+
+    if(which==='history') renderHistory();
+    if(which==='services') renderServicesPanel();
+    if(which==='dashboard') renderDashboard();
+  }
+  $('tab-new').addEventListener('click', ()=>switchTab('new'));
+  $('tab-history').addEventListener('click', ()=>switchTab('history'));
+  $('tab-services').addEventListener('click', ()=>switchTab('services'));
+  $('tab-dashboard').addEventListener('click', ()=>switchTab('dashboard'));
+
+  // ---------- boot ----------
+  updateBillNoDisplay();
+  addItemRow('', 1, '');
+  renderHistory();
+  render();
+  // ---------- PWA install ----------
+  let deferredInstallPrompt = null;
+  const installAppBtn = document.getElementById('installAppBtn');
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installAppBtn.style.display = 'inline-flex';
+  });
+  installAppBtn.addEventListener('click', async ()=>{
+    if(!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    try{ await deferredInstallPrompt.userChoice; }catch(e){}
+    deferredInstallPrompt = null;
+    installAppBtn.style.display = 'none';
+  });
+  window.addEventListener('appinstalled', ()=>{
+    deferredInstallPrompt = null;
+    installAppBtn.style.display = 'none';
+    setPrintStatus('TISA Billing installed on this device.');
+  });
+  if('serviceWorker' in navigator && location.protocol !== 'file:'){
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+
+})();
+</script>
+<script>if("serviceWorker" in navigator && location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(()=>{});}</script>
+</body>
+</html>
